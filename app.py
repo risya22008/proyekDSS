@@ -7,20 +7,20 @@ def add_custom_css():
     st.markdown("""
     <style>
         .stApp {
-            background-color: #117B6C;
+            background-color: #445D48;
         }
         .stTextInput, .stDataFrame {
             color: #FFFFFF;
         }
         h1, h2, h3 {
-            font-family: 'ITC Avant Garde Gothic';
+            font-family: 'Helvetica', sans-serif; 
             color: #FFF8E8;
         }
         .css-1d391kg {
             background-color: #9DBDFF;
         }
         .stSidebar {
-                background-color: #1D3A45;
+                background-color: #2D3A30 ;
         }
         table {
             border-collapse: collapse;
@@ -42,6 +42,18 @@ def add_custom_css():
         }
         tr:nth-child(odd) {
             background-color: #FFE5D9;
+        }
+        .centered-text {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+            margin-top: 50px; 
+            font-size: 30px;  
+            font-weight: bold;
+            color: #FFF8E8;
+        }
+        background-color: #FFE5D9;
         }
     </style>
     """, unsafe_allow_html=True)
