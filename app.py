@@ -8,17 +8,17 @@ def add_custom_css():
     <style>
         /* Background color */
         .stApp {
-            background-color: #FFE3E3;
+            background-color: #165136;
         }
 
         /* Text color */
         .stTextInput, .stDataFrame {
-            color: #000000; /* Ubah teks menjadi warna hitam */
+            color: #FFFFFF;
         }
 
         /* Title styling */
         h1, h2, h3 {
-            font-family: 'Arial', sans-serif;
+            font-family: 'ITC Avant Garde Gothic';
             color: #FFF8E8;
         }
 
@@ -77,9 +77,9 @@ def wp_method(decision_matrix, weights, criteria_type):
     S = np.ones(decision_matrix.shape[0])
     for j in range(decision_matrix.shape[1]):
         if criteria_type[j] == 'Benefit':
-            S *= decision_matrix[:, j] ** weights[j]
+            S = decision_matrix[:, j] * weights[j]
         else:  # Cost
-            S *= decision_matrix[:, j] ** (-weights[j])
+            S = decision_matrix[:, j] * (-weights[j])
     
     # Calculate V
     V = S / S.sum()
@@ -114,6 +114,24 @@ def topsis_method(decision_matrix, weights, criteria_type):
     scores = distance_to_nadir / (distance_to_ideal + distance_to_nadir)
     
     return normalized, weighted, ideal_solution, nadir_solution, distance_to_ideal, distance_to_nadir, scores
+
+# Fungsi untuk metode AHP (Analytical Hierarchy Process)
+def ahp_method(criteria, pairwise_matrix):
+    eigvals, eigvecs = np.linalg.eig(pairwise_matrix)
+    max_index = np.argmax(eigvals)
+    principal_eigvec = eigvecs[:, max_index].real
+    weights = principal_eigvec / principal_eigvec.sum()
+    
+    # Hitung consistency index (CI)
+    n = pairwise_matrix.shape[0]
+    lambda_max = eigvals[max_index].real
+    ci = (lambda_max - n) / (n - 1)
+    
+    # Hitung consistency ratio (CR)
+    random_index = [0, 0, 0.58, 0.9, 1.12, 1.24, 1.32, 1.41, 1.45]  # Nilai RI untuk n = 1 sampai 9
+    cr = ci / random_index[n - 1] if n - 1 < len(random_index) else None
+    
+    return weights, ci, cr
 
 # Fungsi utama
 def main():
@@ -168,103 +186,77 @@ def main():
     st.subheader("Masukkan Nilai Kandidat untuk Setiap Kriteria")
     candidate_names = [f"Kandidat {i+1}" for i in range(n_alternatives)]
     decision_matrix = np.zeros((n_alternatives, n_criteria))
-    df_input = pd.DataFrame(decision_matrix, columns=criteria, index=candidate_names)
-
+    df_input = pd.DataFrame(decision_matrix, index=candidate_names, columns=criteria)
+    
     # Tampilkan tabel untuk input nilai menggunakan st.data_editor
     st.write("Silakan masukkan nilai pada tabel di bawah:")
-    edited_df = st.data_editor(df_input, use_container_width=True)
+    # Gunakan st.data_editor dengan dataframe yang benar-benar berbentuk DataFrame
+    try:
+        edited_df = st.data_editor(df_input, use_container_width=True)
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat menampilkan tabel input: {e}")
+
+    # User memilih metode keputusan
+    st.sidebar.header("Pilih Metode Pengambilan Keputusan")
+    method = st.sidebar.selectbox("Metode", ["SAW", "WP", "TOPSIS", "AHP"])
     
     if st.sidebar.button("Hitung"):
-        st.header("Hasil Perhitungan")
-
-        # Metode SAW
-        with st.expander("Metode SAW - Langkah demi Langkah"):
-            saw_normalized, saw_weighted, saw_scores = saw_method(edited_df.values, weights, criteria_type)
-            df_saw_normalized = pd.DataFrame(saw_normalized, columns=criteria, index=edited_df.index)
-            df_saw_weighted = pd.DataFrame(saw_weighted, columns=criteria, index=edited_df.index)
-            df_saw_scores = pd.DataFrame({'Skor SAW': saw_scores}, index=edited_df.index)
-
-            # Menambahkan perankingan untuk SAW
-            df_saw_scores['Peringkat SAW'] = df_saw_scores['Skor SAW'].rank(ascending=False)
-
-            st.subheader("Normalisasi Matriks Keputusan")
-            st.dataframe(df_saw_normalized)
-
-            st.subheader("Matriks Ternormalisasi Terbobot")
-            st.dataframe(df_saw_weighted)
-
-            st.subheader("Skor SAW")
-            st.dataframe(df_saw_scores)
-
-        # Metode WP
-        with st.expander("Metode WP - Langkah demi Langkah"):
-            wp_S, wp_V = wp_method(edited_df.values, weights, criteria_type)
-            
-            df_wp_S = pd.DataFrame({'Nilai S': wp_S}, index=edited_df.index)
-            st.subheader("Menghitung S untuk Setiap Kandidat")
-            st.dataframe(df_wp_S)
-
-            df_wp_V = pd.DataFrame({'Nilai V (Skor WP)': wp_V}, index=edited_df.index)
-            st.subheader("Menghitung V dan Perangkingan (Skor WP)")
-            st.dataframe(df_wp_V)
-
-            df_wp_V['Peringkat'] = df_wp_V['Nilai V (Skor WP)'].rank(ascending=False)
-            st.subheader("Peringkat Berdasarkan WP")
-            st.dataframe(df_wp_V[['Nilai V (Skor WP)', 'Peringkat']])
-
-        # Metode TOPSIS
-        with st.expander("Metode TOPSIS - Langkah demi Langkah"):
-            topsis_normalized, topsis_weighted, ideal_solution, nadir_solution, distance_to_ideal, distance_to_nadir, topsis_scores = topsis_method(edited_df.values, weights, criteria_type)
-            df_topsis_normalized = pd.DataFrame(topsis_normalized, columns=criteria, index=edited_df.index)
-            df_topsis_weighted = pd.DataFrame(topsis_weighted, columns=criteria, index=edited_df.index)
-            df_topsis_scores = pd.DataFrame({'Skor TOPSIS': topsis_scores}, index=edited_df.index)
-
-            # Menambahkan perankingan untuk TOPSIS
-            df_topsis_scores['Peringkat TOPSIS'] = df_topsis_scores['Skor TOPSIS'].rank(ascending=False)
-
-            st.subheader("Normalisasi Matriks Keputusan")
-            st.dataframe(df_topsis_normalized)
-
-            st.subheader("Matriks Ternormalisasi Terbobot")
-            st.dataframe(df_topsis_weighted)
-
-            st.subheader("Skor TOPSIS")
-            st.dataframe(df_topsis_scores)
-
-        # Menampilkan hasil akhir
-        results = pd.DataFrame({
-            'Kandidat': edited_df.index,
-            'SAW': saw_scores,
-            'Peringkat SAW': df_saw_scores['Peringkat SAW'].values,
-            'WP': wp_V,
-            'Peringkat WP': df_wp_V['Peringkat'].values,
-            'TOPSIS': topsis_scores,
-            'Peringkat TOPSIS': df_topsis_scores['Peringkat TOPSIS'].values
-        })
-
-        st.subheader("Skor untuk Setiap Metode")
-        st.dataframe(results.set_index('Kandidat'))
-
-        # Menampilkan rekomendasi
-        st.subheader("Rekomendasi Kandidat Terbaik")
-        best_saw = results.loc[results['SAW'].idxmax(), 'Kandidat']
-        best_wp = results.loc[results['WP'].idxmax(), 'Kandidat']
-        best_topsis = results.loc[results['TOPSIS'].idxmax(), 'Kandidat']
-
-        st.write(f"**Kandidat Terbaik (SAW):** {best_saw}")
-        st.write(f"**Kandidat Terbaik (WP):** {best_wp}")
-        st.write(f"**Kandidat Terbaik (TOPSIS):** {best_topsis}")
-
-    # Visualisasi
-        st.subheader("Visualisasi Hasil")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        results.set_index('Kandidat').plot(kind='bar', ax=ax)
-        plt.title("Perbandingan Skor Metode untuk Setiap Kandidat")
-        plt.xlabel("Kandidat")
-        plt.ylabel("Skor")
-        plt.legend(title="Metode")
-        plt.tight_layout()
-        st.pyplot(fig)
+        if method == "SAW":
+            normalized, weighted, scores = saw_method(decision_matrix, weights, criteria_type)
+            st.subheader("Hasil Perhitungan dengan SAW")
+            st.write("Matriks Ternormalisasi:")
+            st.dataframe(pd.DataFrame(normalized, index=candidate_names, columns=criteria))
+            st.write("Matriks Terbobot:")
+            st.dataframe(pd.DataFrame(weighted, index=candidate_names, columns=criteria))
+            st.write("Nilai Akhir:")
+            st.dataframe(pd.DataFrame(scores, index=candidate_names, columns=["Skor SAW"]))
         
-if __name__ == "__main__":
+        elif method == "WP":
+            S, V = wp_method(decision_matrix, weights, criteria_type)
+            st.subheader("Hasil Perhitungan dengan WP")
+            st.write("Nilai S untuk masing-masing kandidat:")
+            st.dataframe(pd.DataFrame(S, index=candidate_names, columns=["Nilai S"]))
+            st.write("Nilai Akhir:")
+            st.dataframe(pd.DataFrame(V, index=candidate_names, columns=["Skor WP"]))
+        
+        elif method == "TOPSIS":
+            normalized, weighted, ideal_solution, nadir_solution, distance_to_ideal, distance_to_nadir, scores = topsis_method(decision_matrix, weights, criteria_type)
+            st.subheader("Hasil Perhitungan dengan TOPSIS")
+            st.write("Matriks Ternormalisasi:")
+            st.dataframe(pd.DataFrame(normalized, index=candidate_names, columns=criteria))
+            st.write("Matriks Terbobot:")
+            st.dataframe(pd.DataFrame(weighted, index=candidate_names, columns=criteria))
+            st.write("Solusi Ideal (Positif):")
+            st.dataframe(pd.DataFrame([ideal_solution], columns=criteria))
+            st.write("Solusi Ideal Negatif:")
+            st.dataframe(pd.DataFrame([nadir_solution], columns=criteria))
+            st.write("Jarak ke Solusi Ideal Positif:")
+            st.dataframe(pd.DataFrame(distance_to_ideal, index=candidate_names, columns=["Jarak Positif"]))
+            st.write("Jarak ke Solusi Ideal Negatif:")
+            st.dataframe(pd.DataFrame(distance_to_nadir, index=candidate_names, columns=["Jarak Negatif"]))
+            st.write("Nilai Akhir:")
+            st.dataframe(pd.DataFrame(scores, index=candidate_names, columns=["Skor TOPSIS"]))
+        
+        elif method == "AHP":
+            st.subheader("Hasil Perhitungan dengan AHP")
+            pairwise_matrix = np.zeros((n_criteria, n_criteria))
+            st.write("Masukkan matriks perbandingan berpasangan (pairwise matrix):")
+            for i in range(n_criteria):
+                for j in range(i+1, n_criteria):
+                    pairwise_matrix[i, j] = st.number_input(f"Perbandingan {criteria[i]} terhadap {criteria[j]}", min_value=0.1, max_value=9.0, value=1.0, step=0.1, key=f"ahp_{i}_{j}")
+                    pairwise_matrix[j, i] = 1 / pairwise_matrix[i, j]
+            np.fill_diagonal(pairwise_matrix, 1)
+            st.write("Matriks Perbandingan Berpasangan:")
+            st.dataframe(pd.DataFrame(pairwise_matrix, index=criteria, columns=criteria))
+            weights, ci, cr = ahp_method(criteria, pairwise_matrix)
+            st.write("Bobot Kriteria:")
+            st.dataframe(pd.DataFrame(weights, index=criteria, columns=["Bobot"]))
+            st.write(f"Consistency Index (CI): {ci}")
+            st.write(f"Consistency Ratio (CR): {cr}")
+            if cr < 0.1:
+                st.success("Matriks konsisten.")
+            else:
+                st.error("Matriks tidak konsisten. Perlu penyesuaian pada perbandingan.")
+        
+if __name__ == "_main_":
     main()
